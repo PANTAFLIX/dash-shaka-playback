@@ -7,7 +7,7 @@
 		exports["DashShakaPlayback"] = factory(require("clappr"), require("shaka"));
 	else
 		root["DashShakaPlayback"] = factory(root["Clappr"], root["shaka"]);
-})(this, function(__WEBPACK_EXTERNAL_MODULE_1__, __WEBPACK_EXTERNAL_MODULE_2__) {
+})(typeof self !== 'undefined' ? self : this, function(__WEBPACK_EXTERNAL_MODULE_1__, __WEBPACK_EXTERNAL_MODULE_2__) {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -178,6 +178,7 @@ var DashShakaPlayback = function (_HTML5Video) {
     _this._levels = [];
     _this._pendingAdaptationEvent = false;
     _this._isShakaReadyState = false;
+    _this._activeAudioLanguage = null;
 
     options.autoPlay && _this.play();
     return _this;
@@ -255,6 +256,13 @@ var DashShakaPlayback = function (_HTML5Video) {
         _get(DashShakaPlayback.prototype.__proto__ || Object.getPrototypeOf(DashShakaPlayback.prototype), 'stop', this).call(this);
       }
     }
+
+    /**
+    * Determine if the playback does not contain video/has video but video should be ignored.
+    * @property isAudioOnly
+    * @type Boolean
+    */
+
   }, {
     key: 'getPlaybackType',
     value: function getPlaybackType() {
@@ -262,25 +270,36 @@ var DashShakaPlayback = function (_HTML5Video) {
     }
   }, {
     key: 'selectTrack',
-    value: function selectTrack(track) {
-      if (track.type === 'text') {
-        this._player.selectTextTrack(track);
-      } else if (track.type === 'variant') {
-        this._player.selectVariantTrack(track);
-        if (track.mimeType.startsWith('video/')) {
-          // we trigger the adaptation event here
-          // because Shaka doesn't trigger its event on "manual" selection.
-          this._onAdaptation();
-        }
-      } else {
-        throw new Error('Unhandled track type:', track.type);
+    value: function selectTrack(track, clearBuffer) {
+      if (!this.isReady) {
+        return false;
+      }
+      switch (track.type) {
+        case 'text':
+          this._player.selectTextTrack(track);
+          return true;
+        case 'variant':
+          this._player.selectVariantTrack(track, clearBuffer);
+          if (track.mimeType.startsWith('video/')) {
+            // we trigger the adaptation event here
+            // because Shaka doesn't trigger its event on "manual" selection.
+            this._onAdaptation();
+          }
+          return true;
+        default:
+          throw new Error('Unhandled track type:', track.type);
       }
     }
-
-    /**
-     * @override
-     */
-
+  }, {
+    key: 'selectLanguage',
+    value: function selectLanguage(language, role) {
+      if (this.isReady) {
+        this._activeAudioLanguage = language;
+        this._player.selectAudioLanguage(language, role);
+        return true;
+      }
+      return false;
+    }
   }, {
     key: '_enableShakaTextTrack',
     value: function _enableShakaTextTrack(isEnable) {
@@ -340,6 +359,9 @@ var DashShakaPlayback = function (_HTML5Video) {
       this._player = this._createPlayer();
       this._options.shakaConfiguration && this._player.configure(this._options.shakaConfiguration);
       this._options.shakaOnBeforeLoad && this._options.shakaOnBeforeLoad(this._player);
+
+      var preferredAudioLanguage = this._player.getConfiguration().preferredAudioLanguage;
+      this._activeAudioLanguage = preferredAudioLanguage.length ? preferredAudioLanguage : null;
 
       var playerLoaded = this._player.load(this._options.src);
       playerLoaded.then(function () {
@@ -449,6 +471,11 @@ var DashShakaPlayback = function (_HTML5Video) {
       return this._isShakaReadyState;
     }
   }, {
+    key: 'isAudioOnly',
+    get: function get() {
+      return this.isReady ? this._player.isAudioOnly() : false;
+    }
+  }, {
     key: 'textTracks',
     get: function get() {
       return this.isReady && this._player.getTextTracks();
@@ -467,6 +494,21 @@ var DashShakaPlayback = function (_HTML5Video) {
         return t.mimeType.startsWith('video/');
       });
     }
+  }, {
+    key: 'audioLanguages',
+    get: function get() {
+      return this.isReady && this._player.getAudioLanguages();
+    }
+  }, {
+    key: 'activeAudioLanguage',
+    get: function get() {
+      return this._activeAudioLanguage || this.audioLanguages[0] || null;
+    }
+
+    /**
+     * @override
+     */
+
   }, {
     key: 'closedCaptionsTracks',
     get: function get() {

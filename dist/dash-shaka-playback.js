@@ -7,7 +7,7 @@
 		exports["DashShakaPlayback"] = factory(require("clappr"));
 	else
 		root["DashShakaPlayback"] = factory(root["Clappr"]);
-})(this, function(__WEBPACK_EXTERNAL_MODULE_1__) {
+})(typeof self !== 'undefined' ? self : this, function(__WEBPACK_EXTERNAL_MODULE_1__) {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
@@ -178,6 +178,7 @@ var DashShakaPlayback = function (_HTML5Video) {
     _this._levels = [];
     _this._pendingAdaptationEvent = false;
     _this._isShakaReadyState = false;
+    _this._activeAudioLanguage = null;
 
     options.autoPlay && _this.play();
     return _this;
@@ -255,6 +256,13 @@ var DashShakaPlayback = function (_HTML5Video) {
         _get(DashShakaPlayback.prototype.__proto__ || Object.getPrototypeOf(DashShakaPlayback.prototype), 'stop', this).call(this);
       }
     }
+
+    /**
+    * Determine if the playback does not contain video/has video but video should be ignored.
+    * @property isAudioOnly
+    * @type Boolean
+    */
+
   }, {
     key: 'getPlaybackType',
     value: function getPlaybackType() {
@@ -262,25 +270,36 @@ var DashShakaPlayback = function (_HTML5Video) {
     }
   }, {
     key: 'selectTrack',
-    value: function selectTrack(track) {
-      if (track.type === 'text') {
-        this._player.selectTextTrack(track);
-      } else if (track.type === 'variant') {
-        this._player.selectVariantTrack(track);
-        if (track.mimeType.startsWith('video/')) {
-          // we trigger the adaptation event here
-          // because Shaka doesn't trigger its event on "manual" selection.
-          this._onAdaptation();
-        }
-      } else {
-        throw new Error('Unhandled track type:', track.type);
+    value: function selectTrack(track, clearBuffer) {
+      if (!this.isReady) {
+        return false;
+      }
+      switch (track.type) {
+        case 'text':
+          this._player.selectTextTrack(track);
+          return true;
+        case 'variant':
+          this._player.selectVariantTrack(track, clearBuffer);
+          if (track.mimeType.startsWith('video/')) {
+            // we trigger the adaptation event here
+            // because Shaka doesn't trigger its event on "manual" selection.
+            this._onAdaptation();
+          }
+          return true;
+        default:
+          throw new Error('Unhandled track type:', track.type);
       }
     }
-
-    /**
-     * @override
-     */
-
+  }, {
+    key: 'selectLanguage',
+    value: function selectLanguage(language, role) {
+      if (this.isReady) {
+        this._activeAudioLanguage = language;
+        this._player.selectAudioLanguage(language, role);
+        return true;
+      }
+      return false;
+    }
   }, {
     key: '_enableShakaTextTrack',
     value: function _enableShakaTextTrack(isEnable) {
@@ -340,6 +359,9 @@ var DashShakaPlayback = function (_HTML5Video) {
       this._player = this._createPlayer();
       this._options.shakaConfiguration && this._player.configure(this._options.shakaConfiguration);
       this._options.shakaOnBeforeLoad && this._options.shakaOnBeforeLoad(this._player);
+
+      var preferredAudioLanguage = this._player.getConfiguration().preferredAudioLanguage;
+      this._activeAudioLanguage = preferredAudioLanguage.length ? preferredAudioLanguage : null;
 
       var playerLoaded = this._player.load(this._options.src);
       playerLoaded.then(function () {
@@ -449,6 +471,11 @@ var DashShakaPlayback = function (_HTML5Video) {
       return this._isShakaReadyState;
     }
   }, {
+    key: 'isAudioOnly',
+    get: function get() {
+      return this.isReady ? this._player.isAudioOnly() : false;
+    }
+  }, {
     key: 'textTracks',
     get: function get() {
       return this.isReady && this._player.getTextTracks();
@@ -467,6 +494,21 @@ var DashShakaPlayback = function (_HTML5Video) {
         return t.mimeType.startsWith('video/');
       });
     }
+  }, {
+    key: 'audioLanguages',
+    get: function get() {
+      return this.isReady && this._player.getAudioLanguages();
+    }
+  }, {
+    key: 'activeAudioLanguage',
+    get: function get() {
+      return this._activeAudioLanguage || this.audioLanguages[0] || null;
+    }
+
+    /**
+     * @override
+     */
+
   }, {
     key: 'closedCaptionsTracks',
     get: function get() {
@@ -955,7 +997,7 @@ Vi.prototype.parseMedia=function(a,b){var c=0,d=[],e=[],f=[],g=!1,h=!1,k=!1,m=nu
 f}).G("vtte",function(){e.push(null)}).G("vttc",Ad(function(a){e.push(a.buffer)})).G("mdat",function(a){k=!0;O(a)}).parse(a);if(!k&&!g&&!h)throw new w(2,2,2008);for(var q=c,u=0;u<d.length;u++){var t=d[u],r=e[u],x=t.duration||m;x&&(t=t.Vb?c+t.Vb:q,q=t+x,r&&f.push(Wi(r,b.periodStart+t/this.a,b.periodStart+q/this.a)))}return f.filter(Ga)};
 function Wi(a,b,c){var d,e,f;(new N).G("payl",Ad(function(a){d=E(a)})).G("iden",Ad(function(a){e=E(a)})).G("sttg",Ad(function(a){f=E(a)})).parse(a);return d?Xi(d,e,f,b,c):null}function Xi(a,b,c,d,e){a=new Y(d,e,a);b&&(a.id=b);if(c)for(b=new Ae(c),c=Ce(b);c;)Ui(a,c),Be(b,/[ \t]+/gm),c=Ce(b);return a}Lb('application/mp4; codecs="wvtt"',Vi);}.call(g,this));
 if (typeof(module)!="undefined"&&module.exports)module.exports=g.shaka;
-else if (true)!(__WEBPACK_AMD_DEFINE_RESULT__ = function(){return g.shaka}.call(exports, __webpack_require__, exports, module),
+else if (true)!(__WEBPACK_AMD_DEFINE_RESULT__ = (function(){return g.shaka}).call(exports, __webpack_require__, exports, module),
 				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
 else this.shaka=g.shaka;
 })();
